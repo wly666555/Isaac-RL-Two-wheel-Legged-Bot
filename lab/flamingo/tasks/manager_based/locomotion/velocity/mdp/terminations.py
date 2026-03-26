@@ -63,3 +63,14 @@ def time_illegal_contact(
     contact_time = contact_sensor.data.current_contact_time[:, sensor_cfg.body_ids]
 
     return torch.any(contact_time >= time_threshold, dim=1)
+
+def bad_orientation(
+    env: ManagerBasedRLEnv, limit_angle: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+) -> torch.Tensor:
+    """Terminate when the asset's orientation is too far from the desired orientation limits.
+
+    This is computed by checking the angle between the projected gravity vector and the z-axis.
+    """
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObject = env.scene[asset_cfg.name]
+    return torch.acos(-asset.data.projected_gravity_b[:, 2]).abs() > limit_angle

@@ -5,8 +5,7 @@ from collections.abc import Sequence
 from dataclasses import MISSING
 from typing import TYPE_CHECKING
 from isaaclab.utils import configclass
-import numpy as np
-
+import isaaclab.utils.math as math_utils
 
 from isaaclab.envs.mdp import UniformVelocityCommand
 from isaaclab.envs.mdp.commands.commands_cfg import UniformVelocityCommandCfg
@@ -160,6 +159,48 @@ class UniformVelocityWithZCommand(UniformVelocityCommand):
         self.goal_vel_visualizer.visualize(base_pos_w, vel_des_arrow_quat, vel_des_arrow_scale)
         self.current_vel_visualizer.visualize(base_pos_w, vel_arrow_quat, vel_arrow_scale)
 
+class UniformVelocityCommandWithYawEnv(UniformVelocityCommand):
+    r"""Uniform velocity command with an additional yaw-only mode.
+
+    A portion of environments are sampled as yaw-only environments. For these environments,
+    the linear velocities in x and y are forced to zero, and only the yaw command is applied.
+    """
+
+    cfg: UniformVelocityCommandCfg
+
+    def __init__(self, cfg: UniformVelocityCommandCfg, env: ManagerBasedEnv):
+        super().__init__(cfg, env)
+
+        self.is_yawing_env = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+
+    def __str__(self) -> str:
+        msg = "YawOnlyUniformVelocityCommand:\n"
+        msg += f"\tCommand dimension: {tuple(self.command.shape[1:])}\n"
+        msg += f"\tResampling time range: {self.cfg.resampling_time_range}\n"
+        msg += f"\tHeading command: {self.cfg.heading_command}\n"
+        if self.cfg.heading_command:
+            msg += f"\tHeading probability: {self.cfg.rel_heading_envs}\n"
+        msg += f"\tYaw-only probability: {self.cfg.rel_yawing_envs}\n"
+        msg += f"\tStanding probability: {self.cfg.rel_standing_envs}"
+        return msg
+
+    def _resample_command(self, env_ids: Sequence[int]):
+        super()._resample_command(env_ids)
+
+        r = torch.empty(len(env_ids), device=self.device)
+        self.is_yawing_env[env_ids] = r.uniform_(0.0, 1.0) <= self.cfg.rel_yawing_envs
+
+    def _update_command(self):
+        # 부모 로직:
+        # 1) heading yaw 계산
+        # 2) standing env 전체 0
+        super()._update_command()
+
+        # yaw-only env 중 standing이 아닌 env에 대해서만 x, y를 0으로 강제
+        yawing_env_ids = (self.is_yawing_env & ~self.is_standing_env).nonzero(as_tuple=False).flatten()
+        self.vel_command_b[yawing_env_ids, 0:2] = 0.0
+        
+
 @configclass
 class UniformVelocityWithZCommandCfg(UniformVelocityCommandCfg):
     """Configuration for the uniform velocity with z command generator."""
@@ -177,3 +218,16 @@ class UniformVelocityWithZCommandCfg(UniformVelocityCommandCfg):
 
     initial_phase_time: float = 2.0
     """Time for which the initial phase lasts."""
+
+@configclass
+class UniformVelocityCommandWithYawEnvCfg(UniformVelocityCommandCfg):
+    """Configuration for the yaw-only uniform velocity command generator."""
+
+    class_type: type = UniformVelocityCommandWithYawEnv
+
+    rel_yawing_envs: float = 0.0
+    """Probability of environments that receive yaw-only commands.
+
+    For these environments, the linear velocity commands in x and y are forced to zero,
+    and only the yaw angular velocity command is preserved.
+    """

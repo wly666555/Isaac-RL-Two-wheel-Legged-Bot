@@ -7,32 +7,6 @@ import copy
 import os
 import torch
 import torch.nn as nn
-import os
-import yaml
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
-)
-from reportlab.lib.styles import getSampleStyleSheet
-
-
-import os
-import yaml
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
-
-
-import os
-import yaml
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.units import inch
-
 
 import os
 import yaml
@@ -283,19 +257,184 @@ def export_env_as_pdf(yaml_path: str, pdf_path: str = None) -> None:
     ] + spans))
     elements.append(table)
 
-    doc = SimpleDocTemplate(
-        pdf_path,
-        pagesize=letter,
-        title="Track Your Parameters",   # 파일 이름을 PDF 타이틀에
-        author="CoCELO",                     # 여기에 원하시는 author
-        subject="Environment Parameters",    # optional
-        creator="jaehyungcho"          # optional
-    )
-    doc.build(
-        elements,
-        onFirstPage=lambda c, d: None,
-        onLaterPages=_on_page
-    )
+
+    # --- Observations Table ---
+    elements.append(PageBreak())
+    elements.append(Paragraph('[Observations]', header_style))
+    elements.append(Spacer(1, 0.2 * inch))
+
+    observations = data.get('observations', {}) or {}
+
+    obs_data = [[
+        Paragraph('group', subhdr_style),
+        Paragraph('term', subhdr_style),
+        Paragraph('property', subhdr_style),
+        Paragraph('value', subhdr_style),
+    ]]
+    spans = []
+    obs_idx = 1
+    MAX_SAFE_SPAN_ROWS = 25
+
+    def _add_safe_span(col: int, row_start: int, row_end: int, label_text: str):
+        if row_end <= row_start:
+            return
+        segment_start = row_start
+        while segment_start <= row_end:
+            segment_end = min(segment_start + MAX_SAFE_SPAN_ROWS - 1, row_end)
+            obs_data[segment_start][col] = Paragraph(str(label_text), body_style)
+            for rr in range(segment_start + 1, segment_end + 1):
+                obs_data[rr][col] = Paragraph('', body_style)
+            if segment_end > segment_start:
+                spans.append(('SPAN', (col, segment_start), (col, segment_end)))
+            segment_start = segment_end + 1
+
+    def _fmt_obs_value(v):
+        if v is None:
+            return 'null'
+        if isinstance(v, (list, tuple)):
+            return '\n'.join(str(x) for x in v) if len(v) > 0 else '[]'
+        if isinstance(v, dict):
+            if len(v) == 0:
+                return '{}'
+            lines = []
+            for kk, vv in v.items():
+                if isinstance(vv, (list, tuple)):
+                    vv_str = '[' + ', '.join(str(x) for x in vv) + ']'
+                else:
+                    vv_str = str(vv)
+                lines.append(f"{kk}: {vv_str}")
+            return '\n'.join(lines)
+        return str(v)
+
+    GROUP_META_KEYS = {
+        'concatenate_terms',
+        'concatenate_dim',
+        'enable_corruption',
+        'history_length',
+        'flatten_history_dim',
+    }
+
+    for group_name, group_cfg in observations.items():
+        group_start = obs_idx
+        group_first_row = True
+
+        if not isinstance(group_cfg, dict):
+            obs_data.append([
+                Paragraph(str(group_name), body_style),
+                Paragraph('[group]', body_style),
+                Paragraph('value', body_style),
+                Paragraph(_fmt_obs_value(group_cfg), body_style),
+            ])
+            obs_idx += 1
+            continue
+
+        # 1) group-level metadata
+        meta_keys_in_group = [k for k in GROUP_META_KEYS if k in group_cfg]
+        meta_first_row = True
+        meta_start = obs_idx
+        for meta_key in meta_keys_in_group:
+            obs_data.append([
+                Paragraph(str(group_name), body_style) if group_first_row else Paragraph('', body_style),
+                Paragraph('[group]', body_style) if meta_first_row else Paragraph('', body_style),
+                Paragraph(str(meta_key), body_style),
+                Paragraph(_fmt_obs_value(group_cfg.get(meta_key)), body_style),
+            ])
+            obs_idx += 1
+            group_first_row = False
+            meta_first_row = False
+        meta_end = obs_idx - 1
+        _add_safe_span(1, meta_start, meta_end, '[group]')
+
+        # 2) actual observation terms
+        for term_name, term_cfg in group_cfg.items():
+            if term_name in GROUP_META_KEYS:
+                continue
+
+            term_start = obs_idx
+            term_first_row = True
+
+            # null term
+            if term_cfg is None:
+                obs_data.append([
+                    Paragraph(str(group_name), body_style) if group_first_row else Paragraph('', body_style),
+                    Paragraph(str(term_name), body_style),
+                    Paragraph('value', body_style),
+                    Paragraph('null', body_style),
+                ])
+                obs_idx += 1
+                group_first_row = False
+                continue
+
+            # normal term dict
+            if isinstance(term_cfg, dict):
+                for prop, val in term_cfg.items():
+                    obs_data.append([
+                        Paragraph(str(group_name), body_style) if group_first_row else Paragraph('', body_style),
+                        Paragraph(str(term_name), body_style) if term_first_row else Paragraph('', body_style),
+                        Paragraph(str(prop), body_style),
+                        Paragraph(_fmt_obs_value(val), body_style),
+                    ])
+                    obs_idx += 1
+                    group_first_row = False
+                    term_first_row = False
+            else:
+                obs_data.append([
+                    Paragraph(str(group_name), body_style) if group_first_row else Paragraph('', body_style),
+                    Paragraph(str(term_name), body_style),
+                    Paragraph('value', body_style),
+                    Paragraph(_fmt_obs_value(term_cfg), body_style),
+                ])
+                obs_idx += 1
+                group_first_row = False
+
+            term_end = obs_idx - 1
+            _add_safe_span(1, term_start, term_end, str(term_name))
+
+        group_end = obs_idx - 1
+        _add_safe_span(0, group_start, group_end, str(group_name))
+
+    obs_col_widths = [95, 130, 110, 205]
+    obs_table_style = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4F81BD')),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('VALIGN',     (0, 0), (-1, -1), 'TOP'),
+        ('GRID',       (0, 0), (-1, -1), 0.5, colors.black),
+    ]
+    obs_table = Table(obs_data, colWidths=obs_col_widths)
+    obs_table.setStyle(TableStyle(obs_table_style + spans))
+    obs_table_index = len(elements)
+    elements.append(obs_table)
+    elements.append(Spacer(1, 0.5 * inch))
+
+    def _make_doc():
+        return SimpleDocTemplate(
+            pdf_path,
+            pagesize=letter,
+            title="Track Your Parameters",   # 파일 이름을 PDF 타이틀에
+            author="CoCELO",                 # 여기에 원하시는 author
+            subject="Environment Parameters",# optional
+            creator="jaehyungcho"            # optional
+        )
+
+    def _build(doc, flowables):
+        doc.build(
+            list(flowables),
+            onFirstPage=lambda c, d: None,
+            onLaterPages=_on_page
+        )
+
+    try:
+        _build(_make_doc(), elements)
+    except TypeError as err:
+        err_msg = str(err)
+        if "NoneType" in err_msg and "int" in err_msg and "not supported" in err_msg:
+            obs_table_no_span = Table(obs_data, colWidths=obs_col_widths)
+            obs_table_no_span.setStyle(TableStyle(obs_table_style))
+            fallback_elements = list(elements)
+            fallback_elements[obs_table_index] = obs_table_no_span
+            _build(_make_doc(), fallback_elements)
+        else:
+            raise
     print(f"env.pdf generated: {pdf_path}")
 
 def export_policy_as_jit(actor_critic: object, normalizer: object | None, path: str, filename="policy.pt"):

@@ -14,7 +14,7 @@ from lab.flamingo.tasks.manager_based.locomotion.velocity.flamingo_env.velocity_
     CurriculumCfg,
 )
 
-from lab.flamingo.assets.flamingo.flamingo_rev01_5_2 import FLAMINGO_CFG  # isort: skip
+from lab.flamingo.assets.flamingo.flamingo_rev03_2_3 import FLAMINGO_CFG  # isort: skip
 
 
 @configclass
@@ -33,18 +33,18 @@ class FlamingoCurriculumCfg(CurriculumCfg):
 @configclass
 class FlamingoRewardsCfg():
     # -- task
-    # track_lin_vel_xy_exp = RewTerm(
-    #     func=mdp.track_lin_vel_xy_link_exp, weight=2.0, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
-    # )
+    track_lin_vel_xy_exp = RewTerm(
+        func=mdp.track_lin_vel_xy_link_exp, weight=2.0, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
+    )
     track_ang_vel_z_exp = RewTerm(
         func=mdp.track_ang_vel_z_link_exp, weight=1.0, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
     )
 
-    track_lin_vel_xy_exp = RewTerm(
-        func=mdp.track_lin_vel_xy_yaw_frame_exp,
-        weight=2.0,
-        params={"command_name": "base_velocity", "std": 0.25},
-    )
+    # track_lin_vel_xy_exp = RewTerm(
+    #     func=mdp.track_lin_vel_xy_yaw_frame_exp,
+    #     weight=2.0,
+    #     params={"command_name": "base_velocity", "std": 0.25},
+    # )
     # track_ang_vel_z_exp = RewTerm(
     #     func=mdp.track_ang_vel_z_world_exp, weight=1.0, params={"command_name": "base_velocity", "std": 0.25}  #0.5
     # )
@@ -65,7 +65,7 @@ class FlamingoRewardsCfg():
 
     termination_penalty = RewTerm(func=mdp.is_terminated, weight=-200.0)
 
-    lin_vel_z_l2 = RewTerm(func=mdp.lin_vel_z_link_l2, weight=-1.0)
+    lin_vel_z_l2 = RewTerm(func=mdp.lin_vel_z_link_l2, weight=-2.0)
     ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_link_l2, weight=-0.05)
 
     joint_deviation_hip = RewTerm(
@@ -73,11 +73,11 @@ class FlamingoRewardsCfg():
         weight=-1.0,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_hip_joint"])},
     )
-    joint_deviation_shoulder = RewTerm(
-        func=mdp.joint_deviation_zero_l1,
-        weight=-0.5,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_shoulder_joint"])},
-    )
+    # joint_deviation_shoulder = RewTerm(
+    #     func=mdp.joint_deviation_zero_l1,
+    #     weight=-0.15,
+    #     params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_shoulder_joint"])},
+    # )
 
     dof_pos_limits_hip = RewTerm(
         func=mdp.joint_pos_limits,
@@ -120,9 +120,9 @@ class FlamingoRewardsCfg():
     flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-5.0)
     base_height = RewTerm(
         func=mdp.base_height_adaptive_l2,
-        weight=-25.0,
+        weight=-50.0,
         params={
-            "target_height": 0.48,
+            "target_height": 0.455,
             "asset_cfg": SceneEntityCfg("robot", body_names="base_link"),
             # "sensor_cfg": SceneEntityCfg("base_height_scanner"),
         },
@@ -174,10 +174,10 @@ class FlamingoFlatEnvCfg(LocomotionVelocityFlatEnvCfg):
         self.observations.none_stack_critic.base_pos_z.params["sensor_cfg"] = None
 
         self.observations.none_stack_policy.height_scan = None
-        # self.observations.none_stack_policy.base_lin_vel = None
-        # self.observations.none_stack_policy.base_pos_z = None
-        # self.observations.none_stack_policy.current_reward = None
-        # self.observations.none_stack_policy.is_contact = None
+        self.observations.none_stack_policy.base_lin_vel = None
+        self.observations.none_stack_policy.base_pos_z = None
+        self.observations.none_stack_policy.current_reward = None
+        self.observations.none_stack_policy.is_contact = None
         self.observations.none_stack_policy.lift_mask = None
 
         self.observations.none_stack_policy.roll_pitch_commands = None

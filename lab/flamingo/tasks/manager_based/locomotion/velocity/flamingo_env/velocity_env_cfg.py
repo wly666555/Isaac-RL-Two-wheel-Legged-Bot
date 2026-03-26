@@ -163,16 +163,21 @@ class ActionsCfg:
         asset_name="robot",
         joint_names=["left_hip_joint", "right_hip_joint", 
                      ],
-        scale=1.0,
+        scale=0.125,
         use_default_offset=False,
         preserve_order=True,
     )
-    shoudler_leg_joint_pos = mdp.JointPositionActionCfg(
+    shoudler_joint_pos = mdp.JointPositionActionCfg(
         asset_name="robot",
-        joint_names=["left_shoulder_joint", "right_shoulder_joint", 
-                     "left_leg_joint", "right_leg_joint"
-                     ],
-        scale=1.0,
+        joint_names=["left_shoulder_joint", "right_shoulder_joint"],
+        scale=0.25,
+        use_default_offset=False,
+        preserve_order=True,
+    )
+    leg_joint_pos = mdp.JointPositionActionCfg(
+        asset_name="robot",
+        joint_names=["left_leg_joint", "right_leg_joint"],
+        scale=0.25,
         use_default_offset=False,
         preserve_order=True,
     )
@@ -213,20 +218,20 @@ class ObservationsCfg:
             params={
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_hip_joint", ".*_shoulder_joint"]),
             },            
-            scale=0.15)
+            scale=0.05)
         joint_vel_leg = ObsTerm(
             func=mdp.joint_vel_leg_gear, 
             params={
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_leg_joint"]),
                 "gear_ratio": -1.5,
             },            
-            scale=0.15)  # default: -1.5 
+            scale=0.05)  # default: -1.5 
         joint_vel_wheel = ObsTerm(
             func=mdp.joint_vel,
             params={
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_wheel_joint"]),
             },            
-            scale=0.15)  # default: -1.5          
+            scale=0.05)  # default: -1.5          
         base_ang_vel = ObsTerm(func=mdp.base_ang_vel_link, scale=0.25)  # default: -0.15
         # base_euler = ObsTerm(func=mdp.base_euler_angle_link)
         base_projected_gravity = ObsTerm(func=mdp.projected_gravity)  # default: -0.05
@@ -238,7 +243,7 @@ class ObservationsCfg:
 
     @configclass
     class NoneStackCriticCfg(ObsGroup):
-        velocity_commands = ObsTerm(func=mdp.generated_scaled_commands, params={"command_name": "base_velocity", "scale": (1.0, 0.0, 0.25)})
+        velocity_commands = ObsTerm(func=mdp.generated_scaled_commands, params={"command_name": "base_velocity", "scale": (2.0, 0.0, 0.25)})
         roll_pitch_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "roll_pitch"})
         event_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "event"})
 
@@ -266,7 +271,7 @@ class ObservationsCfg:
 
         base_lin_vel_z = ObsTerm(func=mdp.base_lin_vel_z_link, scale=0.25)
         base_lin_vel_y = ObsTerm(func=mdp.base_lin_vel_y_link)
-        base_lin_vel_x = ObsTerm(func=mdp.base_lin_vel_x_link, scale=1.0)
+        base_lin_vel_x = ObsTerm(func=mdp.base_lin_vel_x_link, scale=2.0)
 
         base_pos_z = ObsTerm(func=mdp.base_pos_z_rel_link, params={"sensor_cfg": SceneEntityCfg("base_height_scanner")})
         current_reward = ObsTerm(func=mdp.current_reward)
@@ -295,14 +300,14 @@ class ObservationsCfg:
         """Observations for Stack policy group."""
         joint_pos_hip_shoulder = ObsTerm(
             func=mdp.joint_pos,
-            noise=Unoise(n_min=-0.05, n_max=0.05),  # default: -0.05
+            noise=Unoise(n_min=-0.025, n_max=0.025),  # default: -0.05
             params={
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_hip_joint", ".*_shoulder_joint"]),
             },
         )
         joint_pos_leg = ObsTerm(
             func=mdp.joint_pos_leg_gear,
-            noise=Unoise(n_min=-0.05, n_max=0.05),  # default: 0.05
+            noise=Unoise(n_min=-0.025, n_max=0.025),  # default: 0.05
             params={
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_leg_joint"]),
                 "gear_ratio": -1.5,
@@ -313,23 +318,23 @@ class ObservationsCfg:
             noise=Unoise(n_min=-1.5, n_max=1.5),
             params={
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_hip_joint", ".*_shoulder_joint"]),
-            },            
-            scale=0.15)  # default: -1.5  
+            },
+            scale=0.05)  # default: -1.5  
         joint_vel_leg = ObsTerm(
             func=mdp.joint_vel_leg_gear,
             noise=Unoise(n_min=-1.5, n_max=1.5), # default: 1.5
             params={
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_leg_joint"]),
                 "gear_ratio": -1.5,
-            },            
-            scale=0.15)  # default: -1.5 
+            },
+            scale=0.05)  # default: -1.5 
         joint_vel_wheel = ObsTerm(
             func=mdp.joint_vel,
             noise=Unoise(n_min=-1.5, n_max=1.5),
             params={
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_wheel_joint"]),
-            },            
-            scale=0.15)  # default: -1.5  
+            },
+            scale=0.05)  # default: -1.5
         base_ang_vel = ObsTerm(func=mdp.base_ang_vel_link, noise=Unoise(n_min=-0.15, n_max=0.15), scale=0.25)  # default: -0.15
         # base_euler = ObsTerm(func=mdp.base_euler_angle_link, noise=Unoise(n_min=-0.125, n_max=0.125))  # default: -0.125
         base_projected_gravity = ObsTerm(func=mdp.projected_gravity, noise=Unoise(n_min=-0.05, n_max=0.05))  # default: -0.05
@@ -343,7 +348,7 @@ class ObservationsCfg:
     @configclass
     class NoneStackPolicyCfg(ObsGroup):
         """Observations for None-Stack policy group."""
-        velocity_commands = ObsTerm(func=mdp.generated_scaled_commands, params={"command_name": "base_velocity", "scale": (1.0, 0.0, 0.25)})
+        velocity_commands = ObsTerm(func=mdp.generated_scaled_commands, params={"command_name": "base_velocity", "scale": (2.0, 0.0, 0.25)})
         roll_pitch_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "roll_pitch"})
         event_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "event"})
         height_scan = ObsTerm(
@@ -352,7 +357,7 @@ class ObservationsCfg:
             clip=(-1.0, 1.0),
             noise=Unoise(n_min=-0.1, n_max=0.1),
         )
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel_x_link, scale=1.0)
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel_x_link, scale=2.0)
         base_pos_z = ObsTerm(func=mdp.base_pos_z_rel_link, params={"sensor_cfg": SceneEntityCfg("base_height_scanner")})
         current_reward = ObsTerm(func=mdp.current_reward)
         is_contact = ObsTerm(
@@ -438,7 +443,7 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="base_link"),
-            "com_distribution_params": (-0.05, -0.02),
+            "com_distribution_params": (-0.065, -0.026),
             "operation": "add",
         },
     )
